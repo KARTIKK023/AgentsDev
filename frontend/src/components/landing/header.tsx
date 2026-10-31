@@ -7,7 +7,7 @@ export function Header() {
     <header className="border-b">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="text-lg font-semibold">
-          MyApp
+          AgentsDev
         </Link>
         <nav className="flex items-center gap-2">
           <Button variant="ghost" size="sm">

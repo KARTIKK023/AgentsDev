@@ -1,5 +1,6 @@
-import { DashboardHeader } from "@/components/dashboard/dashboard-header"
-import { DashboardFooter } from "@/components/dashboard/dashboard-footer"
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
+import { AppSidebar } from "@/components/dashboard/sidebar/app-sidebar"
+import { DashboardHeader } from "@/components/dashboard/dashboard/dashboard-header"
 
 export default function DashboardLayout({
   children,
@@ -7,10 +8,15 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex min-h-screen flex-col">
-      <DashboardHeader />
-      <main className="flex-1">{children}</main>
-      <DashboardFooter />
-    </div>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <DashboardHeader />
+        <main className="flex flex-1 flex-col gap-4 p-4">
+          {children}
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
+
