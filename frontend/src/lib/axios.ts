@@ -8,20 +8,6 @@ const api = axios.create({
   withCredentials: true,
 })
 
-api.interceptors.request.use(
-  (config) => {
-    // Add auth token if exists
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
-
 api.interceptors.response.use(
   (response) => response,
   (error) => {

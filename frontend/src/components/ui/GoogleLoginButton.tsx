@@ -6,13 +6,12 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { auth, googleProvider } from "@/utils/firebase";
 import api from "@/lib/axios";
-import { useAuth } from "@/context/auth-context";
+import getCurrentUser from "@/features/getCurrentUser";
 
 export default function GoogleLoginButton() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const router = useRouter();
-  const { fetchUser } = useAuth();
 
   async function handleLogin(idToken: string) {
     const { data } = await api.post("/auth/login", { idToken });
@@ -32,7 +31,7 @@ export default function GoogleLoginButton() {
       console.log(idToken);
 
       await handleLogin(idToken);
-      await fetchUser();
+      await getCurrentUser(); // Fetch and store user data in Redux
       router.push("/dashboard");
     } catch (error) {
       console.error("Google login failed:", error);

@@ -17,7 +17,7 @@ export const createConversation = async (req , res) => {
 
 export const getConversations = async (req , res) => {
     try {
-        const userId = req.headers("x-user-id")
+        const userId = req.headers["x-user-id"]
         const conversations = await Conversation.find({
             userId:userId
         }).sort({updatedAt:-1})
@@ -32,13 +32,30 @@ export const getConversations = async (req , res) => {
 export const updateConversation = async (req, res) => {
     try {
         const{id, title} = req.body
-        const conversation = await Conversation.findByIdAndUpdate(id,{
-            title
-        })
+        const conversation = await Conversation.findByIdAndUpdate(
+            id,
+            {title},
+            {new:true}
+        )
 
         return res.status(200).json(conversation)
     } catch (error) {
          return res.status(500).json(`error in updateConversation ${error}`)
+    }
+}
+
+export const deleteConversation = async (req, res) => {
+    try {
+        const { conversationId } = req.params
+        if (!conversationId) {
+            return res.status(400).json({ error: "Conversation ID is required" })
+        }
+        const conversation = await Conversation.findByIdAndDelete(conversationId)
+        const messages = await Message.deleteMany({ conversationId });
+
+        return res.status(200).json(conversation, messages)
+    } catch (error) {
+        return res.status(500).json(`error in deleteConversation ${error}`)
     }
 }
 
@@ -58,8 +75,9 @@ export const saveMessage =async (req ,res) => {
 
 export const getMessages =async (req ,res) => {
     try {
+        const { conversationId } = req.params
         const messages = await Message.find({
-            conversationId: req.params.conversationId
+            conversationId: conversationId
         }).sort({createdAt:-1})
         return res.status(200).json(messages)
     } catch (error) {
