@@ -4,9 +4,9 @@ import dotenv from "dotenv";
 import pino from "pino";
 import pinoHttp from "pino-http";
 import helmet from "helmet";
-
-
 import cookieParser from "cookie-parser";
+import {connectDB} from "./config/db.js";
+import chatRoutes from "./routes/agent.route.js"
  
 
 dotenv.config();
@@ -68,6 +68,7 @@ app.use(
     })
   );
 
+app.use("/agent", chatRoutes)
 
 app.get("/agent", (req, res) => {
     res.status(200).json({ message: "agent is running", status: "ok" });
@@ -75,5 +76,5 @@ app.get("/agent", (req, res) => {
 
 app.listen(process.env.PORT, () => {
     console.log(`agent is running on port ${process.env.PORT}`);
-    
+    connectDB();
 });

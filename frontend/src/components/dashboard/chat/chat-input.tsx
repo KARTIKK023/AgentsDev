@@ -1,138 +1,370 @@
-"use client"
 
-import * as React from "react"
-import { ArrowUpIcon, PlusIcon } from "lucide-react"
+"use client";
 
-import { Bubble, BubbleContent } from "@/components/ui/bubble"
-import { Button } from "@/components/ui/button"
+import * as React from "react";
+import {
+  ArrowUpIcon,
+  ChevronDownIcon,
+  FileTextIcon,
+  PlusIcon,
+  XIcon,
+  SquareIcon,
+} from "lucide-react";
+
+import { Separator } from "@/components/ui/separator";
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentMedia,
+  AttachmentTitle,
+} from "@/components/ui/attachment";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupTextarea,
-} from "@/components/ui/input-group"
-import { Message, MessageContent } from "@/components/ui/message"
+} from "@/components/ui/input-group";
 
-const suggestions = [
-  "Add a dark mode toggle",
-  "Fix the failing build",
-  "Write tests for the form",
-  "Upgrade to Next.js 16",
-  "Add a loading state",
-  "Find unused dependencies",
-]
+import type { RootState } from "@/redux/store";
+import sendMessage from "@/features/message/sendMessage";
+import { useDispatch, useSelector } from "react-redux";
+import getMessages from "@/features/message/getMessages";
+import { setMessages } from "@/redux/messageSlice";
 
-const replies: Record<string, string> = {
-  "Add a dark mode toggle":
-    "Added a ModeToggle to the site header. It calls setTheme from next-themes.",
-  "Fix the failing build":
-    "The build failed on a missing import in app/page.tsx. I added it and the build passes.",
-  "Write tests for the form":
-    "Added four tests in signup-form.test.tsx. They cover the empty, invalid and valid states.",
-  "Upgrade to Next.js 16":
-    "Ran the codemod and bumped next to 16. Two routes needed async params, so I updated them.",
-  "Add a loading state":
-    "Added a loading.tsx to the dashboard route. It shows skeletons while the data loads.",
-  "Find unused dependencies":
-    "Three packages are not imported anywhere: lodash, moment and classnames. Should I remove them?",
+
+type AttachmentFile = {
+  id: string;
+  file: File;
+};
+
+const providers = [
+  {
+    name: "OpenAI",
+    models: [
+      { id: "gpt-5", name: "GPT-5" },
+      { id: "gpt-5-mini", name: "GPT-5 mini" },
+    ],
+  },
+  {
+    name: "Anthropic",
+    models: [
+      { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5" },
+      { id: "claude-haiku-4-5", name: "Claude Haiku 4.5" },
+    ],
+  },
+];
+
+const models = providers.flatMap((provider) => provider.models);
+
+const efforts = [
+  { id: "low", name: "Low" },
+  { id: "medium", name: "Medium" },
+  { id: "high", name: "High" },
+];
+
+interface ChatInputProps {
+  isGenerating?: boolean;
+  onStop?: () => void;
 }
 
-export function ChatInput() {
-  const [text, setText] = React.useState("")
-  const [turn, setTurn] = React.useState<{
-    prompt: string
-    reply: string
-  } | null>(null)
-  const formRef = React.useRef<HTMLFormElement>(null)
-  const canSend = text.trim().length > 0
+export function ChatInput({
+  isGenerating = false,
+  onStop,
+}: ChatInputProps) {
+  const [text, setText] = React.useState("");
+  const [files, setFiles] = React.useState<AttachmentFile[]>([]);
+  const [model, setModel] = React.useState(models[0].id);
+  const [effort, setEffort] = React.useState("medium");
 
-  function send(prompt: string) {
-    setTurn({
-      prompt,
-      reply:
-        replies[prompt] ?? "This demo only knows the suggestions. Pick one.",
-    })
-    setText("")
+  const formRef = React.useRef<HTMLFormElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  const currentModel =
+    models.find((item) => item.id === model) ?? models[0];
+
+  const currentEffort =
+    efforts.find((item) => item.id === effort) ?? efforts[1];
+
+  const canSend =
+    (text.trim().length > 0 || files.length > 0) && !isGenerating;
+
+  const { selectedConversation } = useSelector((state: RootState) => state.conversations);
+  
+
+const dispatch = useDispatch();
+
+const handleSendMessage = async (event: React.FormEvent<HTMLFormElement>) => {
+  event.preventDefault();
+  if (!canSend || !selectedConversation) return;
+
+  const payload = {
+    prompt: text.trim(),
+    conversationId: selectedConversation._id,
+  };
+
+  try {
+    await sendMessage(payload);
+
+    setText("");
+    setFiles([]);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+
+    const data = await getMessages(selectedConversation._id);
+    dispatch(setMessages(data));
+  } catch (error) {
+    console.error("Failed to send message:", error);
+  }
+};
+
+  function onAttach(event: React.ChangeEvent<HTMLInputElement>) {
+    const selected = event.target.files;
+
+    if (!selected) return;
+
+    setFiles((current) => [
+      ...current,
+      ...Array.from(selected, (file) => ({
+        id: crypto.randomUUID(),
+        file,
+      })),
+    ]);
+
+    event.target.value = "";
   }
 
-  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!canSend) {
-      return
-    }
-
-    send(text.trim())
+  function removeFile(id: string) {
+    setFiles((current) =>
+      current.filter((item) => item.id !== id)
+    );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-6 py-6 text-sm">
-      {turn && (
-        <div className="flex flex-col gap-4">
-          <Message align="end">
-            <MessageContent>
-              <Bubble align="end" variant="muted">
-                <BubbleContent>{turn.prompt}</BubbleContent>
-              </Bubble>
-            </MessageContent>
-          </Message>
-          <Message>
-            <MessageContent>
-              <p>{turn.reply}</p>
-            </MessageContent>
-          </Message>
-        </div>
-      )}
-      <div className="flex flex-col gap-2">
-        <div className="flex scroll-fade-x scrollbar-none gap-2 overflow-x-auto overscroll-x-contain">
-          {suggestions.map((suggestion) => (
-            <Button
-              key={suggestion}
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              onClick={() => send(suggestion)}
-            >
-              {suggestion}
-            </Button>
-          ))}
-        </div>
-        <form ref={formRef} onSubmit={onSubmit}>
+    <>
+      <Separator />
+
+      <div className="mx-auto w-full max-w-3xl px-4 py-4 sm:px-6">
+        <form ref={formRef} onSubmit={handleSendMessage}>
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            className="sr-only"
+            tabIndex={-1}
+            onChange={onAttach}
+          />
+
           <InputGroup>
+
+            {/* Attachments */}
+            {files.length > 0 && (
+              <InputGroupAddon
+                align="block-start"
+                className="flex-wrap gap-2"
+              >
+                {files.map((item) => (
+                  <Attachment key={item.id} size="sm">
+                    <AttachmentMedia>
+                      <FileTextIcon />
+                    </AttachmentMedia>
+
+                    <AttachmentContent>
+                      <AttachmentTitle>
+                        {item.file.name}
+                      </AttachmentTitle>
+                    </AttachmentContent>
+
+                    <AttachmentActions>
+                      <AttachmentAction
+                        aria-label={`Remove ${item.file.name}`}
+                        onClick={() => removeFile(item.id)}
+                      >
+                        <XIcon />
+                      </AttachmentAction>
+                    </AttachmentActions>
+                  </Attachment>
+                ))}
+              </InputGroupAddon>
+            )}
+
+            {/* Textarea */}
             <InputGroupTextarea
+              ref={textareaRef}
               value={text}
+              disabled={isGenerating}
               onChange={(event) => setText(event.target.value)}
-              placeholder="Ask the agent to change your code..."
+              placeholder={
+                isGenerating
+                  ? "Agent is responding..."
+                  : "Ask the agent to change your code..."
+              }
+              rows={1}
+              className="max-h-52 min-h-12 resize-none p-3"
               onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault()
-                  formRef.current?.requestSubmit()
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  formRef.current?.requestSubmit();
                 }
               }}
-              className="p-3"
             />
-            <InputGroupAddon align="block-end">
+
+            {/* Bottom controls */}
+            <InputGroupAddon
+              align="block-end"
+              className="flex-wrap"
+            >
+              {/* Attach */}
               <InputGroupButton
+                type="button"
                 size="icon-sm"
                 variant="outline"
                 className="rounded-full"
                 aria-label="Attach files"
+                disabled={isGenerating}
+                onClick={() => inputRef.current?.click()}
               >
                 <PlusIcon />
               </InputGroupButton>
-              <InputGroupButton
-                type="submit"
-                size="icon-sm"
-                variant="default"
-                className="ml-auto rounded-full"
-                disabled={!canSend}
-                aria-label="Send"
-              >
-                <ArrowUpIcon />
-              </InputGroupButton>
+
+              {/* Model selector */}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <InputGroupButton
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      aria-label={`Model: ${currentModel.name}`}
+                      className="ml-auto"
+                      disabled={isGenerating}
+                    >
+                      {currentModel.name}
+                      <ChevronDownIcon />
+                    </InputGroupButton>
+                  }
+                />
+
+                <DropdownMenuContent align="start" className="w-48">
+                  <DropdownMenuRadioGroup
+                    value={model}
+                    onValueChange={setModel}
+                  >
+                    {providers.map((provider, index) => (
+                      <React.Fragment key={provider.name}>
+                        {index > 0 && <DropdownMenuSeparator />}
+
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel>
+                            {provider.name}
+                          </DropdownMenuLabel>
+
+                          {provider.models.map((item) => (
+                            <DropdownMenuRadioItem
+                              key={item.id}
+                              value={item.id}
+                              closeOnClick
+                            >
+                              {item.name}
+                            </DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuGroup>
+                      </React.Fragment>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Effort selector */}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <InputGroupButton
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      aria-label={`Effort: ${currentEffort.name}`}
+                      disabled={isGenerating}
+                    >
+                      <span className="text-muted-foreground">
+                        Effort
+                      </span>
+                      {currentEffort.name}
+                      <ChevronDownIcon />
+                    </InputGroupButton>
+                  }
+                />
+
+                <DropdownMenuContent align="start" className="w-36">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>
+                      Effort
+                    </DropdownMenuLabel>
+
+                    <DropdownMenuRadioGroup
+                      value={effort}
+                      onValueChange={setEffort}
+                    >
+                      {efforts.map((item) => (
+                        <DropdownMenuRadioItem
+                          key={item.id}
+                          value={item.id}
+                          closeOnClick
+                        >
+                          {item.name}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Send / Stop */}
+              {isGenerating ? (
+                <InputGroupButton
+                  type="button"
+                  size="icon-sm"
+                  variant="destructive"
+                  className="rounded-full"
+                  aria-label="Stop generating"
+                  onClick={onStop}
+                  disabled={!onStop}
+                >
+                  <SquareIcon className="size-3 fill-current" />
+                </InputGroupButton>
+              ) : (
+                <InputGroupButton
+                  type="submit"
+                  size="icon-sm"
+                  variant="default"
+                  className="rounded-full"
+                  disabled={!canSend}
+                  aria-label="Send message"
+                >
+                  <ArrowUpIcon />
+                </InputGroupButton>
+              )}
             </InputGroupAddon>
           </InputGroup>
         </form>
       </div>
-    </div>
-  )
+    </>
+  );
 }
